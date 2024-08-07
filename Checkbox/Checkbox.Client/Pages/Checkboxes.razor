@@ -1,0 +1,76 @@
+﻿@page "/"
+@rendermode @(new InteractiveWebAssemblyRenderMode(prerender: false))
+@using Microsoft.AspNetCore.SignalR.Client
+@using System.Collections
+@inject NavigationManager Navigation
+@inject ILogger<Checkboxes> logger
+@inject HttpClient httpClient
+@implements IAsyncDisposable
+
+<PageTitle>Checkboxes</PageTitle>
+
+<h1>Checkboxes</h1>
+
+<div class="row">
+    <Virtualize Items="checkboxList" Context="item" OverscanCount="1000">
+        <div class="col">
+            <input class="form-check-input" type="checkbox" @bind="item.Value" @onclick="async () => await Send(item.Index)" id="@($"Checkbox{item.Index}")" disabled="@(!IsConnected)">
+        </div>
+    </Virtualize>
+</div>
+
+@code {
+    private HubConnection? hubConnection;
+    private List<(int Index, bool Value)> checkboxList = new();
+
+    protected override async Task OnInitializedAsync()
+
+    {
+        var checkboxes = await httpClient.GetFromJsonAsync<List<bool>>("../state");
+
+        if (checkboxes != null)
+        {
+            checkboxList = Enumerable.Range(0, checkboxes.Count)
+                                     .Select(index => (index, checkboxes[index]))
+                                     .ToList();
+        }
+
+        hubConnection = new HubConnectionBuilder()
+            .WithUrl(Navigation.ToAbsoluteUri("/checkboxhub"))
+            .Build();
+
+        hubConnection.On<int, bool>("ReceiveMessage", (id, value) =>
+        {
+            logger.LogInformation("Received Message {id} {value}", id, value);
+            if (checkboxes != null)
+            {
+                checkboxList[id] = (id, value);
+                InvokeAsync(StateHasChanged);
+            }
+        });
+
+        await hubConnection.StartAsync();
+    }
+
+    private async Task Send(int index)
+    {
+        if (hubConnection is not null)
+        {
+
+            logger.LogInformation("Sending Message {index} is {CheckBox1}", index, !checkboxList[index].Value);
+            checkboxList[index] = (index, !checkboxList[index].Value);
+            await hubConnection.SendAsync("SendMessage", index, checkboxList[index].Value);
+        }
+    }
+
+    public bool IsConnected =>
+    hubConnection?.State == HubConnectionState.Connected;
+
+    public async ValueTask DisposeAsync()
+    {
+        if (hubConnection is not null)
+        {
+            await hubConnection.DisposeAsync();
+        }
+    }
+}

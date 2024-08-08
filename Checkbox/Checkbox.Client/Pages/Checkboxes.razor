@@ -7,19 +7,55 @@
 @inject HttpClient httpClient
 @implements IAsyncDisposable
 
-<PageTitle>Checkboxes</PageTitle>
+<PageTitle>One Million Checkboxes</PageTitle>
 
-<h1>Checkboxes</h1>
+<h1>One Million Checkboxes</h1>
+<p>
+    <em>One million checkboxes, each with a unique state, all synchronized in real-time using SignalR.</em>
+</p>
+<p>
+    This project is meant to emulate eieio's one million checkboxes project, but with a Blazor twist. Check out the <a href="https://eieio.games/nonsense/game-14-one-million-checkboxes/">original</a>.
+</p>
+<p>
+    <a href="https://github.com/qkarpowi/OneMillionCheckboxesBlazor/tree/master">Github Repo</a>
+</p>
+<p>
+    @if (!isLoading)
+    {
+        <span class="fw-bold">Current Status: </span> @if (IsConnected)
+        {
+            <span class="text-success">Connected</span>
+        }
+        else
+        {
+            <span class="text-danger">Disconnected</span>
+        }
+    }
+</p>
 
-<div class="row">
-    <Virtualize Items="checkboxList" Context="item" OverscanCount="1000">
-        <div class="col">
-            <input class="form-check-input" type="checkbox" @bind="item.Value" @onclick="async () => await Send(item.Index)" id="@($"Checkbox{item.Index}")" disabled="@(!IsConnected)">
+<hr />
+
+@if (isLoading)
+{
+    <div class="d-flex justify-content-center">
+        <div class="spinner-border" role="status">
         </div>
-    </Virtualize>
-</div>
+        <h3 class="ms-2">Loading...</h3>
+    </div>
+}
+else
+{
+    <div class="row">
+        <Virtualize Items="checkboxList" Context="item" OverscanCount="1000">
+            <div class="col">
+                <input class="form-check-input" type="checkbox" @bind="item.Value" @onclick="async () => await Send(item.Index)" id="@($"Checkbox{item.Index}")" disabled="@(!IsConnected)">
+            </div>
+        </Virtualize>
+    </div>
+}
 
 @code {
+    private bool isLoading = true;
     private HubConnection? hubConnection;
     private List<(int Index, bool Value)> checkboxList = new();
 
@@ -50,6 +86,7 @@
         });
 
         await hubConnection.StartAsync();
+        isLoading = false;
     }
 
     private async Task Send(int index)
